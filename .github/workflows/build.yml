@@ -1,0 +1,73 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select newest Xcode
+        run: |
+          X=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$X" ] && sudo xcode-select -s "$X/Contents/Developer" || true
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ayFLIX.xcodeproj \
+            -scheme ayFLIX \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION="1.0.${{ github.run_number }}" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            build 2>&1 | tee xcodebuild.log \
+            | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          test -d build/Build/Products/Release-iphoneos/ayFLIX.app
+
+      - name: Show errors on failure
+        if: failure()
+        run: grep -n -B2 -A6 "error:" xcodebuild.log | head -200 || true
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/ayFLIX.app Payload/
+          zip -qry ayFLIX.ipa Payload
+          ls -lh ayFLIX.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ayFLIX-ipa
+          path: ayFLIX.ipa
+
+      - name: Publish "latest" release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --yes 2>/dev/null || true
+          gh release create latest ayFLIX.ipa \
+            --title "ayFLIX v1.0.${{ github.run_number }}" \
+            --notes "Build #${{ github.run_number }} — unsigned IPA, install via Sideloadly / AltStore" \
+            --latest
