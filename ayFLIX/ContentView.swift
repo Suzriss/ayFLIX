@@ -4,6 +4,7 @@ struct ContentView: View {
     @State private var items: [Media] = []
     @State private var query = ""
     @State private var loading = true
+    @State private var error: String?
     @State private var player: Media?
 
     private let columns = [GridItem(.adaptive(minimum: 110), spacing: 12)]
@@ -13,8 +14,27 @@ struct ContentView: View {
             ZStack {
                 Color(hex: "#0b0f19").ignoresSafeArea()
 
-                if loading && items.isEmpty {
-                    ProgressView().tint(.white)
+                if loading {
+                    ProgressView().tint(.white).scaleEffect(1.4)
+
+                } else if let err = error {
+                    VStack(spacing: 12) {
+                        Image(systemName: "wifi.slash")
+                            .font(.system(size: 44))
+                            .foregroundStyle(.white.opacity(0.4))
+                        Text(err)
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.6))
+                            .multilineTextAlignment(.center)
+                        Button("إعادة المحاولة") { Task { await load(search: query) } }
+                            .foregroundStyle(Color(hex: "#ff2e93"))
+                    }
+                    .padding()
+
+                } else if items.isEmpty {
+                    Text("لا نتائج")
+                        .foregroundStyle(.white.opacity(0.5))
+
                 } else {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 12) {
@@ -46,12 +66,23 @@ struct ContentView: View {
 
     private func load(search q: String) async {
         loading = true
+        error = nil
         defer { loading = false }
         do {
-            items = try await (q.trimmingCharacters(in: .whitespaces).isEmpty
+            let trimmed = q.trimmingCharacters(in: .whitespaces)
+            items = try await (trimmed.isEmpty
                 ? MovieService.trending()
-                : MovieService.search(q))
-        } catch { }
+                : MovieService.search(trimmed))
+            if items.isEmpty && !trimmed.isEmpty {
+                error = "لا نتائج لـ \"\(trimmed)\""
+            }
+        } catch {
+            self.error = "تعذّر الاتصال بالإنترنت"
+            // fallback data لو الـ API ما اشتغل
+            if items.isEmpty {
+                items = MovieService.fallback
+            }
+        }
     }
 }
 
@@ -70,7 +101,8 @@ struct MediaCard: View {
                     default:
                         Color(hex: "#1c273e")
                             .overlay(Image(systemName: "film")
-                                .foregroundStyle(.white.opacity(0.2)))
+                                .font(.largeTitle)
+                                .foregroundStyle(.white.opacity(0.15)))
                     }
                 }
                 .frame(maxWidth: .infinity)
