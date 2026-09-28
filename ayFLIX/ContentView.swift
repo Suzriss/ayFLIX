@@ -17,12 +17,13 @@ struct ContentView: View {
                 if loading {
                     ProgressView().tint(.white).scaleEffect(1.4)
 
-                } else if let err = error {
+                } else if items.isEmpty {
+                    // ماكو ولا بيانات (ولا احتياطية) — شاشة خطأ مع إعادة محاولة
                     VStack(spacing: 12) {
                         Image(systemName: "wifi.slash")
                             .font(.system(size: 44))
                             .foregroundStyle(.white.opacity(0.4))
-                        Text(err)
+                        Text(error ?? "لا نتائج")
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.6))
                             .multilineTextAlignment(.center)
@@ -31,12 +32,16 @@ struct ContentView: View {
                     }
                     .padding()
 
-                } else if items.isEmpty {
-                    Text("لا نتائج")
-                        .foregroundStyle(.white.opacity(0.5))
-
                 } else {
                     ScrollView {
+                        // شريط تنبيه صغير لو نعرض بيانات احتياطية
+                        if error != nil {
+                            Text(error!)
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.5))
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 8)
+                        }
                         LazyVGrid(columns: columns, spacing: 12) {
                             ForEach(items) { item in
                                 MediaCard(item: item)

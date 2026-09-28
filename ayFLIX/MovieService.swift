@@ -1,11 +1,11 @@
 import Foundation
 
 enum MovieService {
-    private static let key  = "15d23e101e4a2ec680f056559d16b534"
-    private static let base = "https://api.themoviedb.org/3"
+    // proxy على سيرفرك — يجيب من TMDB ويمرّره (يتجاوز الحجب + يخفي المفتاح)
+    private static let base = "https://dev.ceresify.com/moviebox/api"
 
     static func trending() async throws -> [Media] {
-        let url = URL(string: "\(base)/trending/all/day?api_key=\(key)&language=ar-SA")!
+        let url = URL(string: "\(base)/trending")!
         let (data, resp) = try await URLSession.shared.data(from: url)
         guard (resp as? HTTPURLResponse)?.statusCode == 200 else {
             throw URLError(.badServerResponse)
@@ -14,12 +14,8 @@ enum MovieService {
     }
 
     static func search(_ query: String) async throws -> [Media] {
-        var comps = URLComponents(string: "\(base)/search/multi")!
-        comps.queryItems = [
-            .init(name: "api_key",  value: key),
-            .init(name: "query",    value: query),
-            .init(name: "language", value: "ar-SA"),
-        ]
+        var comps = URLComponents(string: "\(base)/search")!
+        comps.queryItems = [.init(name: "q", value: query)]
         let (data, resp) = try await URLSession.shared.data(from: comps.url!)
         guard (resp as? HTTPURLResponse)?.statusCode == 200 else {
             throw URLError(.badServerResponse)
