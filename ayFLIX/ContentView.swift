@@ -52,7 +52,7 @@ struct ContentView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .searchable(text: $query, prompt: "بحث...")
             .autocorrectionDisabled()
-            .onChange(of: query) { _, q in
+            .onChange(of: query) { q in
                 Task { await load(search: q) }
             }
             .task { await load(search: "") }
